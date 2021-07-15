@@ -23,6 +23,7 @@ export interface NextcloudFoldersConfig {
   username: string
   password: string
   serverRoot?: string
+  includeCredentials?: boolean
 }
 
 interface IChildFolder {
@@ -64,6 +65,7 @@ export default class NextcloudFoldersAdapter implements Adapter, BulkImportResou
       username: 'bob',
       password: 's3cret',
       serverRoot: '',
+      includeCredentials: false,
     }
   }
 
@@ -72,7 +74,7 @@ export default class NextcloudFoldersAdapter implements Adapter, BulkImportResou
   }
 
   getData():NextcloudFoldersConfig {
-    return { ...this.server }
+    return { ...NextcloudFoldersAdapter.getDefaultValues(), ...this.server }
   }
 
   getLabel():string {
@@ -419,7 +421,7 @@ export default class NextcloudFoldersAdapter implements Adapter, BulkImportResou
     }
   }
 
-  async loadFolderChildren(folderId:string|number): Promise<TItem[]> {
+  async loadFolderChildren(folderId:string|number, all?: boolean): Promise<TItem[]> {
     if (!this.hasFeatureHashing) {
       return
     }
@@ -430,20 +432,25 @@ export default class NextcloudFoldersAdapter implements Adapter, BulkImportResou
     if (folder.loaded) {
       return folder.clone(true).children
     }
-    const children = await this._getChildren(folderId, 1)
-    const recurse = async(children) => {
-      return Parallel.each(children, async(child) => {
-        if (!(child instanceof Folder)) {
-          return
-        }
-        if (!child.loaded) {
-          const folderHash = await this._getFolderHash(child.id)
-          child.hashValue = { true: folderHash }
-        }
-        await recurse(child.children)
-      })
+    let children
+    if (all) {
+      children = await this._getChildren(folderId, -1)
+    } else {
+      children = await this._getChildren(folderId, 1)
+      const recurse = async(children) => {
+        return Parallel.each(children, async(child) => {
+          if (!(child instanceof Folder)) {
+            return
+          }
+          if (!child.loaded) {
+            const folderHash = await this._getFolderHash(child.id)
+            child.hashValue = { true: folderHash }
+          }
+          await recurse(child.children)
+        })
+      }
+      await recurse(children)
     }
-    await recurse(children)
     folder.children = children
     folder.loaded = true
     this.tree.createIndex()
@@ -789,7 +796,7 @@ export default class NextcloudFoldersAdapter implements Adapter, BulkImportResou
         Promise.race([
           fetch(url, {
             method: verb,
-            credentials: 'omit',
+            credentials: this.server.includeCredentials ? 'include' : 'omit',
             headers: {
               ...(type && { 'Content-type': type }),
               Authorization: 'Basic ' + authString,
@@ -807,6 +814,10 @@ export default class NextcloudFoldersAdapter implements Adapter, BulkImportResou
     } catch (e) {
       if (timedOut) throw e
       throw new Error(browser.i18n.getMessage('Error017'))
+    }
+
+    if (res.redirected) {
+      throw new Error(browser.i18n.getMessage('Error033'))
     }
 
     if (returnRawResponse) {
