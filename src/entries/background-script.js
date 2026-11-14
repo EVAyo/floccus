@@ -1,8 +1,4 @@
-import Controller from '../lib/Controller'
+import BrowserController from '../lib/browser/BrowserController'
 
-window.controller = new Controller()
-
-const onload = () => {
-  window.controller.onLoad()
-}
-window.addEventListener('load', onload)
+const controller = new BrowserController
+controller.onLoad()

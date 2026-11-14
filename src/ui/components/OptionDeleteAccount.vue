@@ -1,6 +1,9 @@
 <template>
   <div>
-    <div class="text-h6">
+    <div
+      class="text-h6"
+      role="heading"
+      aria-level="3">
       {{ t('LabelRemoveaccount') }}
     </div>
     <div class="caption">
@@ -8,6 +11,7 @@
     </div>
     <v-btn
       small
+      color="red accent-1"
       class="mt-3"
       @click="onClick">
       {{ t('LabelRemoveaccount') }}

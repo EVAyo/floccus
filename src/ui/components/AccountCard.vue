@@ -2,47 +2,54 @@
   <v-card
     :loading="Boolean(account.data.syncing)"
     color="light-blue-lighten-5">
-    <v-progress-linear
-      v-if="account.data.syncing"
-      v-slot:progress
-      :value="account.data.syncing * 100 || 0"
-      :indeterminate="account.data.syncing < 0.1" />
+    <template #progress>
+      <v-progress-linear
+        v-if="account.data.syncing"
+        :value="account.data.syncing * 100 || 0" />
+    </template>
     <v-container class="pa-4">
       <v-row
         no-gutters
         class="flex-column">
         <v-col>
-          <v-row no-gutters>
+          <v-row
+            no-gutters
+            class="account-card__header">
             <v-col class="flex-grow-1">
               <div class="overline">
                 {{ account.data.type }}
               </div>
-              <div class="text-h6">
+              <div
+                class="text-h6"
+                role="heading"
+                aria-level="2">
                 <v-icon
                   v-if="account.data.localRoot === 'tabs'"
-                  color="primary">
+                  color="primary"
+                  aria-hidden="true">
                   mdi-tab
                 </v-icon>
                 <v-icon
                   v-else
-                  color="primary">
+                  color="primary"
+                  aria-hidden="true">
                   mdi-folder
-                </v-icon> {{ folderName }}
+                </v-icon>
+                {{ folderName }}
               </div>
               <div class="caption">
                 {{ uri }}
               </div>
             </v-col>
-            <v-col
-              class="align-end flex-grow-0"
-              :style="{minWidth: 'max-content'}">
+            <v-col class="align-end flex-grow-0 account-card__statusColumn">
               <div class="pa-3 d-inline-block font-weight-light body-2">
                 <v-icon
                   :color="statusColor"
-                  :class="{spinning: account.data.syncing}">
+                  :class="{ spinning: account.data.syncing }"
+                  aria-hidden="true">
                   {{ statusIcon }}
                 </v-icon>
-                <span :style="{color: statusColor}">{{ statusLabel }}</span>
+                <span :style="{ color: statusColor }">{{ statusLabel }}</span>
               </div>
             </v-col>
           </v-row>
@@ -55,14 +62,54 @@
             :icon="false"
             :type="statusType"
             class="pa-2 text-caption">
-            {{ statusDetail }} <v-btn
-              v-if="account.data.error"
-              :color="statusType"
-              class="float-right"
-              x-small
-              @click="onGetLogs">
-              {{ t('LabelDebuglogs') }}
-            </v-btn>
+            {{ statusDetail }}
+            <template v-if="account.data.error">
+              <v-btn
+                :color="statusType"
+                class="float-end ms-1 mt-1"
+                x-small
+                target="_blank"
+                href="https://github.com/floccusaddon/floccus/issues">
+                {{ t('LabelReportproblem') }}
+              </v-btn>
+              <v-btn
+                :color="statusType"
+                class="float-end ms-1 mt-1"
+                x-small
+                target="_blank"
+                href="https://floccus.org/faq/">
+                {{ t('LabelFaq') }}
+              </v-btn>
+              <v-btn
+                :color="statusType"
+                class="float-end ms-1 mt-1"
+                x-small
+                @click="onGetLogs">
+                {{ t('LabelDebuglogs') }}
+              </v-btn>
+            </template>
+            <template v-if="needsAuthorization">
+              <v-btn
+                :color="statusType"
+                class="float-end ms-1 mt-1"
+                x-small
+                :to="{
+                  name: routes.ACCOUNT_OPTIONS,
+                  params: { accountId: account.id },
+                }"
+                target="_blank">
+                {{ t('LabelAuthorize') }}
+              </v-btn>
+            </template>
+            <template v-if="status === 'scheduled'">
+              <v-btn
+                :color="statusType"
+                class="float-end"
+                x-small
+                @click="onForceSync">
+                {{ t('LabelScheduledforcesync') }}
+              </v-btn>
+            </template>
           </v-alert>
           <v-alert
             v-if="legacyWarning"
@@ -82,84 +129,69 @@
         <v-col>
           <v-row
             no-gutters
-            class="mt-2">
-            <v-col class="d-flex flex-row">
-              <v-select
-                v-model="account.data.strategy"
-                dense
-                :items="[
-                  {text: strategyLabels['slave'], value: 'slave', icon: strategyIcons['slave']},
-                  {text: strategyLabels['overwrite'], value: 'overwrite', icon: strategyIcons['overwrite']},
-                  {text: strategyLabels['default'], value: 'default', icon: strategyIcons['default']},
-                ]"
-                @change="onChangeStrategy">
-                <template #prepend-inner>
-                  <v-icon>{{ strategyIcons[account.data.strategy] }}</v-icon>
-                </template>
-                <template #item="{item}">
-                  <v-icon>{{ item.icon }}</v-icon> {{ item.text }}
-                </template>
-              </v-select>
+            class="mt-2 account-card__footer">
+            <v-col class="d-flex flex-row account-card__options">
+              <v-btn
+                small
+                class="ma-1"
+                :to="{
+                  name: routes.ACCOUNT_OPTIONS,
+                  params: { accountId: account.id },
+                }"
+                target="_blank">
+                <v-icon aria-hidden="true">
+                  mdi-cog
+                </v-icon>
+                {{ t('LabelOptions') }}
+              </v-btn>
+            </v-col>
+            <v-col class="d-flex flex-row justify-end account-card__actions">
+              <v-btn
+                class="ma-1 ms-0"
+                small
+                :disabled="account.data.syncing || account.data.scheduled"
+                :title="t('LabelSyncDownOnce')"
+                :aria-label="t('LabelSyncDownOnce')"
+                @click="onTriggerSyncDown">
+                <v-icon aria-hidden="true">
+                  mdi-arrow-down-bold
+                </v-icon>
+              </v-btn>
+              <v-btn
+                class="ma-1"
+                small
+                :disabled="account.data.syncing || account.data.scheduled"
+                :title="t('LabelSyncUpOnce')"
+                :aria-label="t('LabelSyncUpOnce')"
+                @click="onTriggerSyncUp">
+                <v-icon aria-hidden="true">
+                  mdi-arrow-up-bold
+                </v-icon>
+              </v-btn>
               <v-btn
                 v-if="!account.data.syncing"
-                class="primary"
+                :disabled="account.data.scheduled"
+                class="primary ma-1"
                 small
+                :title="t('LabelSyncnow')"
+                :aria-label="t('LabelSyncnow')"
                 @click="onTriggerSync">
-                <v-icon>mdi-sync</v-icon>
-                {{ t('LabelSyncnow') }}
+                <v-icon aria-hidden="true">
+                  mdi-sync
+                </v-icon>
               </v-btn>
               <v-btn
                 v-else
+                class="ma-1 me-0"
                 small
+                :title="t('LabelCancelsync')"
+                :aria-label="t('LabelCancelsync')"
                 @click="onCancelSync">
-                <v-icon>mdi-cancel</v-icon>
-                {{ t('LabelCancelsync') }}
+                <v-icon aria-hidden="true">
+                  mdi-cancel
+                </v-icon>
               </v-btn>
             </v-col>
-          </v-row>
-          <v-row :class="{'d-none': !showDetails, 'pa-2': true, 'mt-3': true, 'justify-space-between': true}">
-            <v-btn
-              small
-              @click="onTriggerSyncUp">
-              <v-icon>mdi-arrow-up-bold</v-icon>
-              {{ t('LabelSyncUpOnce') }}
-            </v-btn>
-            <v-switch
-              v-model="account.data.enabled"
-              :aria-label="t('LabelAutosync')"
-              :label="t('LabelAutosync')"
-              dense
-              class="mt-0 pt-0"
-              @change="onToggleEnabled" />
-          </v-row>
-          <v-row :class="{'d-none': !showDetails, 'pa-2': true, 'mb-3': true, 'justify-space-between': true}">
-            <v-btn
-              small
-              @click="onTriggerSyncDown">
-              <v-icon>mdi-arrow-down-bold</v-icon>
-              {{ t('LabelSyncDownOnce') }}
-            </v-btn>
-
-            <v-btn
-              small
-              :to="{ name: routes.ACCOUNT_OPTIONS, params: { accountId: account.id } }"
-              target="_blank">
-              <v-icon>mdi-settings</v-icon>
-              {{ t('LabelOptions') }}
-            </v-btn>
-          </v-row>
-          <v-row>
-            <v-btn
-              text
-              block
-              @click="showDetails = !showDetails">
-              <v-icon v-if="!showDetails">
-                mdi-chevron-down
-              </v-icon>
-              <v-icon v-else>
-                mdi-chevron-up
-              </v-icon>
-            </v-btn>
           </v-row>
         </v-col>
       </v-row>
@@ -170,17 +202,18 @@
 <script>
 import PathHelper from '../../lib/PathHelper'
 import humanizeDuration from 'humanize-duration'
-import { actions } from '../store'
+import { actions } from '../store/definitions'
 import { routes } from '../router'
-import LocalTree from '../../lib/LocalTree'
+import BrowserTree from '../../lib/browser/BrowserTree'
+import { needsAuthorization } from '../../lib/AccountAuthorization'
 
 export default {
   name: 'AccountCard',
   props: {
     account: {
       type: Object,
-      required: true
-    }
+      required: true,
+    },
   },
   data() {
     return {
@@ -189,31 +222,45 @@ export default {
         disabled: 'rgb(125, 114, 128)',
         ok: '#3d8e39',
         error: '#8e3939',
-        syncing: '#2196F3'
+        authorize: '#8e6739',
+        syncing: '#2196F3',
+        scheduled: '#2196F3',
+        pending: '#d32f2f',
       },
       statusIcons: {
         disabled: 'mdi-sync-off',
         ok: 'mdi-check',
         error: 'mdi-sync-alert',
-        syncing: 'mdi-sync'
+        authorize: 'mdi-login-variant',
+        syncing: 'mdi-sync',
+        scheduled: 'mdi-timer-sync-outline',
+        pending: 'mdi-alert-circle-outline',
       },
       statusLabels: {
         disabled: this.t('StatusDisabled'),
         ok: this.t('StatusAllgood'),
         error: this.t('StatusError'),
-        syncing: this.t('StatusSyncing')
+        authorize: this.t('StatusAuthorizationneeded'),
+        syncing: this.t('StatusSyncing'),
+        scheduled: this.t('StatusScheduled'),
+        pending: this.t('StatusNeedssync'),
       },
       strategyIcons: {
         slave: 'mdi-arrow-down-bold',
         overwrite: 'mdi-arrow-up-bold',
-        default: 'mdi-sync',
+        default: 'mdi-merge',
       },
       strategyLabels: {
         slave: this.t('LabelSyncDown'),
         overwrite: this.t('LabelSyncUp'),
         default: this.t('LabelSyncNormal'),
       },
-      showDetails: false
+      strategyDescriptions: {
+        slave: this.t('DescriptionSyncDown'),
+        overwrite: this.t('DescriptionSyncUp'),
+        default: this.t('DescriptionSyncNormal'),
+      },
+      showDetails: false,
     }
   },
   computed: {
@@ -229,14 +276,30 @@ export default {
     uri() {
       return this.account.label
     },
+    needsAuthorization() {
+      return needsAuthorization(this.account.data)
+    },
     status() {
       if (this.account.data.syncing) {
         return 'syncing'
       }
+      if (this.account.data.scheduled) {
+        return 'scheduled'
+      }
+      if (this.needsAuthorization) {
+        return 'authorize'
+      }
       if (this.account.data.error) {
         return 'error'
       }
-      if (!this.account.data.enabled) {
+      if (this.account.data.pendingChanges) {
+        return 'pending'
+      }
+      if (
+        !this.account.data.enabled &&
+        !this.account.data.syncIntervalEnabled &&
+        !this.account.data.syncOnStartupEnabled
+      ) {
         return 'disabled'
       }
       return 'ok'
@@ -251,51 +314,90 @@ export default {
       return this.statusLabels[this.status]
     },
     statusType() {
+      if (this.needsAuthorization) {
+        return 'warning'
+      }
       if (this.account.data.error) {
         return 'error'
+      }
+      if (this.status === 'pending') {
+        return 'warning'
       }
       return 'info'
     },
     statusDetail() {
+      if (this.needsAuthorization) {
+        return this.t('DescriptionAuthorizationneeded')
+      }
       if (this.account.data.error) {
-        return this.account.data.error
+        return (
+          this.account.data.error +
+          ' | ' +
+          this.t('StatusLastsynced', [
+            humanizeDuration(Date.now() - this.account.data.lastSync, {
+              largest: 1,
+              round: true,
+              language: navigator.language.split('-')[0],
+              fallbacks: navigator.languages
+                .map((lang) => lang.split('-')[0])
+                .concat(['en']),
+            }),
+          ])
+        )
       }
       if (this.account.data.syncing) {
-        return 'Synchronization in progress.'
+        return this.t('DescriptionSyncinprogress')
+      }
+      if (this.account.data.scheduled) {
+        return this.t('DescriptionSyncscheduled')
+      }
+      if (this.status === 'pending') {
+        const pending = this.account.data.pendingChanges
+        return pending.initial
+          ? this.t('DescriptionPendingInitialSync')
+          : this.t('DescriptionPendingChanges', [String(pending.local), String(pending.server)])
       }
       if (this.account.data.lastSync) {
-        return this.t(
-          'StatusLastsynced',
+        return this.t('StatusLastsynced', [
           humanizeDuration(Date.now() - this.account.data.lastSync, {
             largest: 1,
-            round: true
-          })
-        )
+            round: true,
+            language: navigator.language.split('-')[0],
+            fallbacks: navigator.languages
+              .map((lang) => lang.split('-')[0])
+              .concat(['en']),
+          }),
+        ])
       }
       return this.t('StatusNeversynced')
     },
     legacyWarning() {
-      if (this.account.data.type === 'nextcloud' ||
-          this.account.data.type === 'nextcloud-legacy') {
+      if (
+        this.account.data.type === 'nextcloud' ||
+        this.account.data.type === 'nextcloud-legacy'
+      ) {
         return this.t('LegacyAdapterDeprecation')
       }
       return null
     },
     routes() {
       return routes
-    }
+    },
   },
   watch: {
     async localRoot(localRoot) {
-      this.rootPath = await LocalTree.getPathFromLocalId(localRoot)
-    }
+      this.rootPath = await BrowserTree.getPathFromLocalId(localRoot)
+    },
   },
   async created() {
-    this.rootPath = await LocalTree.getPathFromLocalId(this.localRoot)
+    this.rootPath = await BrowserTree.getPathFromLocalId(this.localRoot)
   },
   methods: {
     onChangeStrategy() {
-      this.$store.dispatch(actions.STORE_ACCOUNT, {id: this.account.id, data: this.account.data})
+      this.$store.dispatch(actions.STORE_ACCOUNT, {
+        id: this.account.id,
+        data: this.account.data,
+      })
     },
     onTriggerSync() {
       this.$store.dispatch(actions.TRIGGER_SYNC, this.account.id)
@@ -310,12 +412,20 @@ export default {
       this.$store.dispatch(actions.CANCEL_SYNC, this.account.id)
     },
     onToggleEnabled() {
-      this.$store.dispatch(actions.STORE_ACCOUNT, {id: this.account.id, data: this.account.data})
+      this.$store.dispatch(actions.STORE_ACCOUNT, {
+        id: this.account.id,
+        data: this.account.data,
+      })
     },
     onGetLogs() {
       this.$store.dispatch(actions.DOWNLOAD_LOGS)
-    }
-  }
+    },
+    onForceSync() {
+      if (confirm(this.t('DescriptionScheduledforcesync'))) {
+        this.$store.dispatch(actions.FORCE_SYNC, this.account.id)
+      }
+    },
+  },
 }
 </script>
 
@@ -324,12 +434,36 @@ export default {
   animation: spin 2s infinite linear;
 }
 
+@media (min-width: 420px) {
+  .account-card__statusColumn {
+    min-width: max-content;
+  }
+}
+
+@media (max-width: 419px) {
+  .account-card__header {
+    flex-direction: column;
+  }
+  .account-card__footer {
+    flex-direction: column !important;
+  }
+  .account-card__actions {
+    flex-direction: column !important;
+  }
+  .account-card__actions .ms-0 {
+    margin-inline-start: 4px !important;
+  }
+  .account-card__options {
+    flex-direction: column !important;
+  }
+}
+
 @keyframes spin {
   0% {
-    transform: rotate(0deg);
+    transform: rotate(360deg);
   }
   99.9% {
-    transform: rotate(360deg);
+    transform: rotate(0deg);
   }
 }
 </style>

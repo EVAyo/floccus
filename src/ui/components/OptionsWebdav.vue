@@ -1,10 +1,24 @@
 <template>
   <v-container>
+    <div>
+      <v-text-field
+        append-icon="mdi-label"
+        class="mt-2 mb-4"
+        :value="label"
+        :label="t('LabelAccountlabel')"
+        :hint="t('DescriptionAccountlabel')"
+        :persistent-hint="true"
+        @input="$emit('update:label', $event)" />
+    </div>
     <v-card class="mb-4">
       <v-card-text
         id="server"
-        class="text-h5">
-        <v-icon>mdi-account-box</v-icon>
+        class="text-h5"
+        role="heading"
+        aria-level="2">
+        <v-icon aria-hidden="true">
+          mdi-account-box
+        </v-icon>
         {{ t('LabelOptionsServerDetails') }}
       </v-card-text>
       <v-card-text>
@@ -18,10 +32,23 @@
           :label="t('LabelUsername')"
           @input="$emit('update:username', $event)" />
         <v-text-field
-          :value="password"
-          type="password"
           :label="t('LabelPassword')"
-          @input="$emit('update:password', $event)" />
+          :type="showPassword ? 'text' : 'password'"
+          @input="$emit('update:password', $event)">
+          <template #append>
+            <v-icon
+              role="button"
+              tabindex="0"
+              :aria-label="
+                showPassword ? t('LabelHidepassword') : t('LabelShowpassword')
+              "
+              @click="showPassword = !showPassword"
+              @keydown.enter="showPassword = !showPassword"
+              @keydown.space.prevent="showPassword = !showPassword">
+              {{ showPassword ? 'mdi-eye' : 'mdi-eye-off' }}
+            </v-icon>
+          </template>
+        </v-text-field>
         <v-text-field
           append-icon="mdi-file-document"
           :value="bookmark_file"
@@ -30,23 +57,26 @@
           :hint="t('DescriptionBookmarksfile')"
           :persistent-hint="true"
           @input="$emit('update:bookmark_file', $event)" />
-        <v-text-field
-          append-icon="mdi-lock"
-          class="mt-2"
-          type="password"
+        <OptionPassphrase
           :value="passphrase"
-          :label="t('LabelPassphrase')"
-          :hint="t('DescriptionPassphrase')"
-          :persistent-hint="true"
           @input="$emit('update:passphrase', $event)" />
+        <OptionFileType
+          :value="bookmark_file_type"
+          @input="$emit('update:bookmark_file_type', $event)" />
       </v-card-text>
     </v-card>
 
-    <v-card class="mb-4">
+    <v-card
+      v-if="isBrowser"
+      class="mb-4">
       <v-card-title
         id="folder"
-        class="text-h5">
-        <v-icon>mdi-folder-outline</v-icon>
+        class="text-h5"
+        role="heading"
+        aria-level="2">
+        <v-icon aria-hidden="true">
+          mdi-folder-outline
+        </v-icon>
         {{ t('LabelOptionsFolderMapping') }}
       </v-card-title>
       <v-card-text>
@@ -56,21 +86,64 @@
       </v-card-text>
     </v-card>
 
+    <v-card
+      v-if="!isBrowser"
+      class="mb-4">
+      <v-card-title
+        id="mobile"
+        class="text-h5"
+        role="heading"
+        aria-level="2">
+        <v-icon aria-hidden="true">
+          mdi-cellphone-settings
+        </v-icon>
+        {{ t('LabelMobilesettings') }}
+      </v-card-title>
+      <v-card-text>
+        <OptionAllowNetwork
+          :value="allowNetwork"
+          @input="$emit('update:allowNetwork', $event)" />
+        <OptionExportBookmarks />
+      </v-card-text>
+    </v-card>
+
     <v-card class="mb-4">
       <v-card-title
         id="sync"
-        class="text-h5">
-        <v-icon>mdi-sync-circle</v-icon>
+        class="text-h5"
+        role="heading"
+        aria-level="2">
+        <v-icon aria-hidden="true">
+          mdi-sync-circle
+        </v-icon>
         {{ t('LabelOptionsSyncBehavior') }}
       </v-card-title>
       <v-card-text>
-        <OptionSyncInterval
-          :value="syncInterval"
-          @input="$emit('update:syncInterval', $event)" />
+        <OptionAutoSync
+          :value="enabled"
+          @input="$emit('update:enabled', $event)" />
+        <OptionSyncOnStartup
+          :value="syncOnStartupEnabled"
+          @input="$emit('update:syncOnStartupEnabled', $event)" />
+        <template v-if="isBrowser">
+          <OptionSyncIntervalEnabled
+            :value="syncIntervalEnabled"
+            @input="$emit('update:syncIntervalEnabled', $event)" />
+          <OptionSyncInterval
+            v-if="syncIntervalEnabled"
+            :value="syncInterval"
+            @input="$emit('update:syncInterval', $event)" />
+          <OptionNotifyOnly
+            :notify-only="notifyOnly"
+            :notifications-enabled="notificationsEnabled"
+            @update:notifyOnly="$emit('update:notifyOnly', $event)"
+            @update:notificationsEnabled="$emit('update:notificationsEnabled', $event)" />
+        </template>
         <OptionSyncStrategy
           :value="strategy"
           @input="$emit('update:strategy', $event)" />
         <OptionNestedSync
+          v-if="isBrowser"
           :value="nestedSync"
           @input="$emit('update:nestedSync', $event)" />
       </v-card-text>
@@ -79,14 +152,23 @@
     <v-card class="mb-4">
       <v-card-title
         id="danger"
-        class="text-h5">
-        <v-icon>mdi-alert-circle</v-icon>
+        class="text-h5"
+        role="heading"
+        aria-level="2">
+        <v-icon aria-hidden="true">
+          mdi-alert-circle
+        </v-icon>
         {{ t('LabelOptionsDangerous') }}
       </v-card-title>
       <v-card-text>
+        <OptionDownloadLogs />
         <OptionClientCert
+          v-if="isBrowser"
           :value="includeCredentials"
           @input="$emit('update:includeCredentials', $event)" />
+        <OptionAllowRedirects
+          :value="allowRedirects"
+          @input="$emit('update:allowRedirects', $event)" />
         <OptionResetCache @click="$emit('reset')" />
         <OptionFailsafe
           :value="failsafe"
@@ -106,21 +188,74 @@ import OptionSyncFolder from './OptionSyncFolder'
 import OptionNestedSync from './OptionNestedSync'
 import OptionFailsafe from './OptionFailsafe'
 import OptionClientCert from './OptionClientCert'
+import OptionAllowRedirects from './OptionAllowRedirects'
+import OptionDownloadLogs from './OptionDownloadLogs'
+import OptionAllowNetwork from './native/OptionAllowNetwork'
+import OptionFileType from './OptionFileType'
+import OptionExportBookmarks from './OptionExportBookmarks.vue'
+import OptionPassphrase from './OptionPassphrase.vue'
+import OptionAutoSync from './OptionAutoSync.vue'
+import OptionSyncIntervalEnabled from './OptionSyncIntervalEnabled.vue'
+import OptionSyncOnStartup from './OptionSyncOnStartup.vue'
+import OptionNotifyOnly from './OptionNotifyOnly.vue'
 
 export default {
   name: 'OptionsWebdav',
-  components: { OptionClientCert, OptionFailsafe, OptionSyncFolder, OptionDeleteAccount, OptionSyncStrategy, OptionResetCache, OptionSyncInterval, OptionNestedSync },
-  props: ['url', 'username', 'password','passphrase', 'includeCredentials', 'serverRoot', 'localRoot', 'syncInterval', 'strategy', 'bookmark_file', 'nestedSync', 'failsafe'],
+  components: {
+    OptionSyncOnStartup,
+    OptionNotifyOnly,
+    OptionSyncIntervalEnabled,
+    OptionAutoSync,
+    OptionExportBookmarks,
+    OptionAllowNetwork,
+    OptionDownloadLogs,
+    OptionAllowRedirects,
+    OptionClientCert,
+    OptionFailsafe,
+    OptionSyncFolder,
+    OptionDeleteAccount,
+    OptionSyncStrategy,
+    OptionResetCache,
+    OptionSyncInterval,
+    OptionNestedSync,
+    OptionFileType,
+    OptionPassphrase,
+  },
+  props: [
+    'url',
+    'username',
+    'password',
+    'passphrase',
+    'includeCredentials',
+    'serverRoot',
+    'localRoot',
+    'allowNetwork',
+    'syncInterval',
+    'strategy',
+    'bookmark_file',
+    'nestedSync',
+    'failsafe',
+    'allowRedirects',
+    'bookmark_file_type',
+    'enabled',
+    'label',
+    'syncIntervalEnabled',
+    'syncOnStartupEnabled',
+    'notifyOnly',
+    'notificationsEnabled',
+  ],
   data() {
     return {
-      panels: [0, 1]
+      panels: [0, 1],
+      showPassword: false,
+      showPassphrase: false,
     }
   },
   methods: {
     validateUrl(str) {
       try {
         const u = new URL(str)
-        return Boolean(u)
+        return Boolean(u) && u.protocol.startsWith('http')
       } catch (e) {
         return false
       }
@@ -128,9 +263,8 @@ export default {
     validateBookmarksFile(path) {
       return path[0] !== '/' && path[path.length - 1] !== '/'
     },
-  }
+  },
 }
 </script>
 
-<style scoped>
-</style>
+<style scoped></style>

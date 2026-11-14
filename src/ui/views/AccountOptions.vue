@@ -8,7 +8,10 @@
       <div class="overline">
         {{ data.type }}
       </div>
-      <div class="headline">
+      <div
+        class="headline"
+        role="heading"
+        aria-level="1">
         {{ folderName || t('LabelUntitledfolder') }}
       </div>
       <v-list
@@ -18,7 +21,9 @@
           link
           @click="$vuetify.goTo('#server', {duration: 0.5})">
           <v-list-item-icon>
-            <v-icon>mdi-account-box</v-icon>
+            <v-icon aria-hidden="true">
+              mdi-account-box
+            </v-icon>
           </v-list-item-icon>
           <v-list-item-content>
             <v-list-item-title>{{ t('LabelOptionsServerDetails') }}</v-list-item-title>
@@ -28,7 +33,9 @@
           link
           @click="$vuetify.goTo('#folder', {duration: 0.5})">
           <v-list-item-icon>
-            <v-icon>mdi-folder-outline</v-icon>
+            <v-icon aria-hidden="true">
+              mdi-folder-outline
+            </v-icon>
           </v-list-item-icon>
           <v-list-item-content>
             <v-list-item-title>{{ t('LabelOptionsFolderMapping') }}</v-list-item-title>
@@ -38,7 +45,9 @@
           link
           @click="$vuetify.goTo('#sync', {duration: 0.5})">
           <v-list-item-icon>
-            <v-icon>mdi-sync-circle</v-icon>
+            <v-icon aria-hidden="true">
+              mdi-sync-circle
+            </v-icon>
           </v-list-item-icon>
           <v-list-item-content>
             <v-list-item-title>{{ t('LabelOptionsSyncBehavior') }}</v-list-item-title>
@@ -48,7 +57,9 @@
           link
           @click="$vuetify.goTo('#danger', {duration: 0.5})">
           <v-list-item-icon>
-            <v-icon>mdi-alert-circle</v-icon>
+            <v-icon aria-hidden="true">
+              mdi-alert-circle
+            </v-icon>
           </v-list-item-icon>
           <v-list-item-content>
             <v-list-item-title>{{ t('LabelOptionsDangerous') }}</v-list-item-title>
@@ -68,7 +79,10 @@
               <div class="overline">
                 {{ data.type }}
               </div>
-              <div class="headline">
+              <div
+                class="headline"
+                role="heading"
+                aria-level="1">
                 {{ folderName || t('LabelUntitledfolder') }}
               </div>
               <v-list
@@ -78,7 +92,9 @@
                   link
                   @click="$vuetify.goTo('#server', {duration: 0.5})">
                   <v-list-item-icon>
-                    <v-icon>mdi-account-box</v-icon>
+                    <v-icon aria-hidden="true">
+                      mdi-account-box
+                    </v-icon>
                   </v-list-item-icon>
                   <v-list-item-content>
                     <v-list-item-title>{{ t('LabelOptionsServerDetails') }}</v-list-item-title>
@@ -88,7 +104,9 @@
                   link
                   @click="$vuetify.goTo('#folder', {duration: 0.5})">
                   <v-list-item-icon>
-                    <v-icon>mdi-folder-outline</v-icon>
+                    <v-icon aria-hidden="true">
+                      mdi-folder-outline
+                    </v-icon>
                   </v-list-item-icon>
                   <v-list-item-content>
                     <v-list-item-title>{{ t('LabelOptionsFolderMapping') }}</v-list-item-title>
@@ -98,7 +116,9 @@
                   link
                   @click="$vuetify.goTo('#sync', {duration: 0.5})">
                   <v-list-item-icon>
-                    <v-icon>mdi-sync-circle</v-icon>
+                    <v-icon aria-hidden="true">
+                      mdi-sync-circle
+                    </v-icon>
                   </v-list-item-icon>
                   <v-list-item-content>
                     <v-list-item-title>{{ t('LabelOptionsSyncBehavior') }}</v-list-item-title>
@@ -108,7 +128,9 @@
                   link
                   @click="$vuetify.goTo('#danger', {duration: 0.5})">
                   <v-list-item-icon>
-                    <v-icon>mdi-alert-circle</v-icon>
+                    <v-icon aria-hidden="true">
+                      mdi-alert-circle
+                    </v-icon>
                   </v-list-item-icon>
                   <v-list-item-content>
                     <v-list-item-title>{{ t('LabelOptionsDangerous') }}</v-list-item-title>
@@ -118,6 +140,19 @@
             </div>
           </v-col>
           <v-col>
+            <div class="d-flex flex-row-reverse">
+              <v-btn
+                class="primary"
+                @click="onSave">
+                {{ t('LabelSave') }}
+              </v-btn>
+              <v-icon
+                v-if="saved"
+                color="green"
+                aria-hidden="true">
+                mdi-check
+              </v-icon>
+            </div>
             <v-form
               v-if="!loading"
               class="mt-3 mb-3">
@@ -126,8 +161,33 @@
                 v-bind.sync="data"
                 @reset="onReset"
                 @delete="onDelete" />
+              <OptionsLinkwarden
+                v-if="data.type === 'linkwarden'"
+                v-bind.sync="data"
+                @reset="onReset"
+                @delete="onDelete" />
+              <OptionsKarakeep
+                v-if="data.type === 'karakeep'"
+                v-bind.sync="data"
+                @reset="onReset"
+                @delete="onDelete" />
               <OptionsWebdav
                 v-if="data.type === 'webdav'"
+                v-bind.sync="data"
+                @reset="onReset"
+                @delete="onDelete" />
+              <OptionsS3
+                v-if="data.type === 's3'"
+                v-bind.sync="data"
+                @reset="onReset"
+                @delete="onDelete" />
+              <OptionsGit
+                v-if="data.type === 'git'"
+                v-bind.sync="data"
+                @reset="onReset"
+                @delete="onDelete" />
+              <OptionsFake
+                v-if="data.type === 'fake'"
                 v-bind.sync="data"
                 @reset="onReset"
                 @delete="onDelete" />
@@ -136,13 +196,8 @@
                 v-bind.sync="data"
                 @reset="onReset"
                 @delete="onDelete" />
-              <OptionsNextcloudLegacy
-                v-if="data.type === 'nextcloud' || data.type === 'nextcloud-legacy'"
-                v-bind.sync="data"
-                @reset="onReset"
-                @delete="onDelete" />
-              <OptionsFake
-                v-if="data.type === 'fake'"
+              <OptionsDropbox
+                v-if="data.type === 'dropbox'"
                 v-bind.sync="data"
                 @reset="onReset"
                 @delete="onDelete" />
@@ -155,7 +210,8 @@
               </v-btn>
               <v-icon
                 v-if="saved"
-                color="green">
+                color="green"
+                aria-hidden="true">
                 mdi-check
               </v-icon>
             </div>
@@ -178,17 +234,21 @@
 
 <script>
 import PathHelper from '../../lib/PathHelper'
-import LocalTree from '../../lib/LocalTree'
-import { actions } from '../store'
+import BrowserTree from '../../lib/browser/BrowserTree'
+import { actions } from '../store/definitions'
 import OptionsNextcloudFolders from '../components/OptionsNextcloudBookmarks'
+import OptionsLinkwarden from '../components/OptionsLinkwarden'
+import OptionsKarakeep from '../components/OptionsKarakeep'
 import OptionsWebdav from '../components/OptionsWebdav'
-import OptionsNextcloudLegacy from '../components/OptionsNextcloudLegacy'
+import OptionsS3 from '../components/OptionsS3.vue'
 import OptionsFake from '../components/OptionsFake'
 import OptionsGoogleDrive from '../components/OptionsGoogleDrive'
+import OptionsDropbox from '../components/OptionsDropbox'
+import OptionsGit from '../components/OptionsGit.vue'
 
 export default {
   name: 'AccountOptions',
-  components: { OptionsGoogleDrive, OptionsFake, OptionsNextcloudLegacy, OptionsWebdav, OptionsNextcloudFolders },
+  components: { OptionsGit, OptionsGoogleDrive, OptionsDropbox, OptionsFake, OptionsWebdav, OptionsS3, OptionsNextcloudFolders, OptionsLinkwarden, OptionsKarakeep },
   data() {
     return {
       folderName: '',
@@ -236,7 +296,7 @@ export default {
     },
     async updateFolderName() {
       const pathArray = PathHelper.pathToArray(decodeURIComponent(
-        await LocalTree.getPathFromLocalId(this.localRoot)
+        await BrowserTree.getPathFromLocalId(this.localRoot)
       ))
       this.folderName = pathArray[pathArray.length - 1]
     },
@@ -257,6 +317,10 @@ export default {
         margin: 0 auto;
     }
     .v-form .v-icon {
-      margin-right: 10px;
+      margin-inline-end: 10px;
+    }
+
+    .text-h6 {
+      margin-top: 20px;
     }
 </style>

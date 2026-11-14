@@ -1,51 +1,61 @@
 const fs = require('fs')
 const url = require('url')
-const { Builder } = require('selenium-webdriver')
+const { Builder, By, until } = require('selenium-webdriver')
+const {
+  Preferences,
+  Level,
+  Type,
+  installConsoleHandler,
+} = require('selenium-webdriver/lib/logging')
 const { Options: ChromeOptions } = require('selenium-webdriver/chrome')
 const { Options: FirefoxOptions } = require('selenium-webdriver/firefox')
-const saveStats = require('./save-stats')
 const fetch = require('node-fetch')
 const VERSION = require('../package.json').version
-;(async function() {
+// Enable SELENIUM logging to console
+installConsoleHandler()
+;(async function () {
+  const loggingPrefs = new Preferences()
+  loggingPrefs.setLevel(Type.CLIENT, Level.INFO)
+  loggingPrefs.setLevel(Type.DRIVER, Level.INFO)
+  loggingPrefs.setLevel(Type.SERVER, Level.INFO)
+
   let driver = await new Builder()
-    .withCapabilities({
-      'sauce:options': {
-        'moz:firefoxOptions': { wc3: true },
-        'goog:chromeOptions': { wc3: true },
-        'seleniumVersion:': '3.11.0'
-      }
-    })
     .usingServer(`http://localhost:4444/wd/hub`)
     .forBrowser(process.env.SELENIUM_BROWSER)
     .setChromeOptions(
       process.env.SELENIUM_BROWSER === 'chrome'
         ? new ChromeOptions()
-          .excludeSwitches('extension-content-verification')
-          .addExtensions(
-            fs.readFileSync(
-              `./builds/floccus-build-v${VERSION}.crx`,
-              'base64'
-            )
-          )
+            .excludeSwitches('extension-content-verification')
+            .addArguments([
+              '--no-sandbox', // see https://bugs.chromium.org/p/chromedriver/issues/detail?id=2473
+              '--remote-debugging-port=9222',
+            ])
+            .addExtensions(`./builds/floccus-build-v${VERSION}.crx`)
         : null
     )
+    .setLoggingPrefs(loggingPrefs)
     .build()
+  console.log('Driver built for browser ' + process.env.SELENIUM_BROWSER)
   try {
     let id, testUrl
     switch (await (await driver.getSession()).getCapability('browserName')) {
       case 'chrome':
         // Scrape extension id from chrome extension page
         await driver.get('chrome://extensions')
-        await new Promise(resolve => setTimeout(resolve, 5000))
-        id = await driver.executeAsyncScript(function() {
+        console.log('Opened chrome://extensions')
+        await driver.sleep(5000)
+        console.log('Slept 5s')
+
+        id = await driver.executeAsyncScript(function () {
           var callback = arguments[arguments.length - 1]
           var extension = document
             .querySelector('extensions-manager')
             .extensions_.find(
-              extension => extension.name === 'floccus bookmarks sync'
+              (extension) => extension.name === 'floccus bookmarks sync'
             )
           callback(extension.id)
         })
+        console.log('Extracted extension.id')
         if (!id) throw new Error('Could not install extension')
         testUrl = `chrome-extension://${id}/`
         break
@@ -53,36 +63,114 @@ const VERSION = require('../package.json').version
       case 'firefox':
         // Scrape extension id from firefox addons page
         await driver.installAddon(
-          `./builds/floccus-build-v${VERSION}.xpi`,
+          `${__dirname}/../builds/floccus-build-v${VERSION}-firefox.zip`,
           true
         )
+        console.log('Installed extension')
+
+        // Get extension URL
         await driver.get('about:debugging')
-        await new Promise(resolve => setTimeout(resolve, 10000))
-        testUrl = await driver.executeScript(function() {
-          const extension = WebExtensionPolicy.getByID(
-            'floccus@handmadeideas.org'
+        console.log('Opened about:debugging')
+        await driver.sleep(10000)
+        console.log('Slept 10s')
+        testUrl = await driver.executeScript(function () {
+          const extension = WebExtensionPolicy.getActiveExtensions().find(
+            ({ name }) => name === 'floccus bookmarks sync'
           )
           return extension.extension.baseURL
         })
+        console.log('Extracted extension.baseURL')
         if (!testUrl) throw new Error('Could not install extension')
         break
       default:
         throw new Error('Unknown browser')
     }
 
-    testUrl += `dist/html/test.html?grep=${process.env.FLOCCUS_TEST}&server=http://${process.env.TEST_HOST}&app_version=${process.env.APP_VERSION}`
+    let server = `http://${process.env.TEST_HOST}`
+
+    if (process.env.FLOCCUS_TEST.includes('linkwarden')) {
+      server = `https://cloud.linkwarden.app`
+    }
+    if (process.env.FLOCCUS_TEST.includes('karakeep')) {
+      server = `http://${process.env.KARAKEEP_TEST_HOST}`
+    }
+
+    testUrl += `dist/html/test.html?grep=${process.env.FLOCCUS_TEST}&server=${server}&app_version=${process.env.APP_VERSION}&browser=${process.env.SELENIUM_BROWSER}`
+
+    testUrl += `&test_url=http://nextcloud/`
+    testUrl += `&ci=true`
 
     if (process.env.FLOCCUS_TEST.includes('google-drive')) {
       testUrl += `&password=${process.env.GOOGLE_API_REFRESH_TOKEN}`
     }
 
+    if (process.env.FLOCCUS_TEST.includes('dropbox')) {
+      testUrl += `&password=${process.env.DROPBOX_API_REFRESH_TOKEN}`
+    }
+
+    if (process.env.FLOCCUS_TEST.includes('linkwarden')) {
+      testUrl += `&username=mk`
+      testUrl += `&password=${process.env.LINKWARDEN_TOKEN}`
+    }
+
+    if (process.env.FLOCCUS_TEST.includes('s3-')) {
+      testUrl += `&s3_server=http://${process.env.S3_TEST_HOST}`
+    }
+
+    if (process.env.FLOCCUS_TEST_SEED) {
+      testUrl += `&seed=${process.env.FLOCCUS_TEST_SEED}`
+    }
+
+    if (process.env.FLOCCUS_TEST.includes('karakeep')) {
+      // We need to create the user for karakeep first and get its API key
+      // Since v0.34 signup goes through better-auth, whose CSRF protection
+      // rejects requests without an Origin header (node's fetch sends none)
+      const createUserResp = await fetch(
+        `${server}/api/auth/sign-up/email`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Origin: server,
+          },
+          body: JSON.stringify({
+            name: 'floccus',
+            email: 'floccus@example.com',
+            password: '12345678',
+          }),
+        }
+      )
+
+      console.log('Created user', createUserResp.status, await createUserResp.text())
+
+      const apiKeyResp = await fetch(
+        `${server}/api/trpc/apiKeys.exchange`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            json: {
+              keyName: 'karakeep',
+              email: 'floccus@example.com',
+              password: '12345678',
+            }
+          }),
+        }
+      )
+      const apiKey = await apiKeyResp.json()
+      testUrl += `&password=${apiKey.result.data.json.key}`
+    }
+
     await driver.get(testUrl)
+    console.log('Opened test page')
 
     let logs = [],
       fin
     do {
-      await new Promise(resolve => setTimeout(resolve, 3000))
-      logs = await driver.executeScript(function() {
+      await new Promise((resolve) => setTimeout(resolve, 3000))
+      logs = await driver.executeScript(function () {
         var logs = window.floccusTestLogs.slice(
           window.floccusTestLogsLength || 0
         )
@@ -90,9 +178,9 @@ const VERSION = require('../package.json').version
         return logs
       })
 
-      logs.forEach(entry => console.log(entry))
+      logs.forEach((entry) => console.log(entry))
     } while (
-      !logs.some(entry => {
+      !logs.some((entry) => {
         if (~entry.indexOf('FINISHED')) {
           fin = entry
           return true
@@ -104,26 +192,6 @@ const VERSION = require('../package.json').version
       await driver.quit()
       process.exit(1)
     } else {
-      const match = fin.match(/duration: (\d+):(\d+)/i)
-      if (match) {
-        const data = {
-          testSuiteTime: parseInt(match[1]) + parseInt(match[2]) / 60,
-          normalizerTime: await getNormalizerTime(),
-        }
-        const label =
-          process.env['FLOCCUS_TEST'] +
-          ' ' +
-          process.env['SELENIUM_BROWSER'] +
-          ' nc@' +
-          process.env['SERVER_BRANCH'] +
-          ' bm@' +
-          process.env['NC_APP_VERSION']
-        try {
-          await saveStats(process.env['GITHUB_SHA'], label, data)
-        } catch (e) {
-          console.log('FAILED TO SAVE BENCHMARK STATS', e)
-        }
-      }
       await driver.quit()
     }
   } catch (e) {
@@ -132,23 +200,3 @@ const VERSION = require('../package.json').version
     process.exit(1)
   }
 })()
-
-async function getNormalizerTime() {
-  const start = Date.now()
-  fibonacci(33) // get a feel for how fast this CPU is rn
-  for (let i = 0; i < 30; i++) { // get a feel for how fast this network card is rns
-    await fetch('http://google.com')
-  }
-  const end = Date.now()
-  return (end - start) / 1000
-}
-
-function fibonacci(num) {
-  if (num === 1) {
-    return 0
-  }
-  if (num === 2) {
-    return 1
-  }
-  return fibonacci(num - 1) + fibonacci(num - 2)
-}

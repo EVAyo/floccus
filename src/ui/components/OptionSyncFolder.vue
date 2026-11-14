@@ -1,11 +1,14 @@
 <template>
   <div>
     <div>
-      <div class="text-h6">
-        {{ t('LabelLocalfolder') }}
+      <div
+        class="text-h6"
+        role="heading"
+        aria-level="3">
+        {{ t('LabelLocaltarget') }}
       </div>
       <div class="caption">
-        {{ t('DescriptionLocalfolder') }}
+        {{ t('DescriptionLocaltarget') }}
       </div>
       <v-radio-group
         v-model="mode"
@@ -13,14 +16,16 @@
         <v-radio value="folder">
           <template #label>
             {{ t('LabelLocalfolder') }}
-            &nbsp;
             <v-text-field
               v-model="path"
+              class="ms-2"
               readonly
+              :aria-label="t('LabelLocalfolder')"
               @click="onTriggerFinder">
               <template #append>
                 <v-icon
-                  color="blue"
+                  color="blue darken-1"
+                  aria-hidden="true"
                   @click="onTriggerFinder">
                   mdi-folder
                 </v-icon>
@@ -28,9 +33,15 @@
             </v-text-field>
           </template>
         </v-radio>
+        <div class="caption ms-8 mb-6">
+          {{ t('DescriptionLocalfolder') }}
+        </div>
         <v-radio
           :label="t('LabelSyncTabs')"
           value="tabs" />
+        <div class="caption ms-8 mb-2">
+          {{ t('DescriptionSyncTabs') }}
+        </div>
       </v-radio-group>
     </div>
     <v-dialog
@@ -48,11 +59,12 @@
             <v-btn
               class="primary ma-2"
               @click="onSave">
-              save
+              {{ t('LabelSave') }}
             </v-btn>
           </v-col>
         </v-row>
         <v-treeview
+          v-if="folders.length"
           class="pa-4"
           activatable
           :item-text="'title'"
@@ -63,7 +75,7 @@
           dense
           @update:active="onUpdateSelection">
           <template #prepend="{ open }">
-            <v-icon>
+            <v-icon aria-hidden="true">
               {{ open ? 'mdi-folder-open' : 'mdi-folder' }}
             </v-icon>
           </template>
@@ -71,14 +83,18 @@
             {{ item.title || t('LabelUntitledfolder') }}
           </template>
         </v-treeview>
+        <v-progress-circular
+          v-else
+          color="primary"
+          indeterminate
+          class="ma-8" />
       </v-card>
     </v-dialog>
   </div>
 </template>
 
 <script>
-import LocalTree from '../../lib/LocalTree'
-import browser from '../../lib/browser-api'
+import { isVivaldi } from '../../lib/browser/BrowserDetection'
 
 export default {
   name: 'OptionSyncFolder',
@@ -115,18 +131,20 @@ export default {
         this.mode = 'tabs'
         return
       }
+      const BrowserTree = (await import('../../lib/browser/BrowserTree')).default
       if (this.value) {
         this.path = decodeURIComponent(
-          await LocalTree.getPathFromLocalId(this.value)
+          await BrowserTree.getPathFromLocalId(this.value)
         ) + '/'
       } else {
-        this.path = this.t('LabelNewfolder')
+        this.path = this.t('LabelSelectfolder')
       }
     },
     async onTriggerFinder() {
+      const browser = (await import('../../lib/browser-api')).default
       this.selectedLocalRoot = this.value
       this.finder = true
-      this.folders = this.filterOutBookmarks(await browser.bookmarks.getTree())
+      this.folders = this.filterOutBookmarks(await isVivaldi() ? await browser.bookmarks.getSubTree('1') : await browser.bookmarks.getTree())
     },
     filterOutBookmarks(children) {
       return children.filter(item => {

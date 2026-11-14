@@ -2,11 +2,26 @@
   <v-app
     id="app"
     :style="appStyle">
+    <v-banner
+      v-if="isBrowser"
+      color="primary"
+      class="mb-1 white--text"
+      single-line>
+      {{ t('DescriptionDonateintervention') }}
+      <template #actions>
+        <v-btn
+          small
+          target="_blank"
+          href="https://floccus.org/donate/">
+          {{ t('LabelDonate') }}
+        </v-btn>
+      </template>
+    </v-banner>
     <v-content>
       <router-view />
     </v-content>
     <v-footer
-      color="#3893cc"
+      color="blue darken-1"
       app>
       <v-row no-gutters>
         <v-col>
@@ -19,42 +34,41 @@
             floccus v{{ VERSION }}
           </v-btn>
           <v-tooltip top>
-            <template v-slot:activator="{ on, attrs }">
+            <template #activator="{ on, attrs }">
               <v-btn
                 x-small
                 text
                 class="white--text"
                 v-bind="attrs"
-                :to="{name: routes.DONATE}"
+                :aria-label="t('LabelFunddevelopment')"
+                :to="{ name: routes.DONATE }"
                 target="_blank"
                 v-on="on">
-                <v-icon>mdi-heart-outline</v-icon>
+                <v-icon aria-hidden="true">
+                  mdi-heart-outline
+                </v-icon>
               </v-btn>
             </template>
             <span>{{ t('LabelFunddevelopment') }}</span>
           </v-tooltip>
-        </v-col>
-        <v-col class="d-flex flex-row-reverse">
-          <v-btn
-            v-if="secured"
-            text
-            x-small
-            :to="{name: routes.SET_KEY}"
-            target="_blank"
-            class="white--text">
-            <v-icon>mdi-lock-outline</v-icon>
-            {{ t('LabelSecuredcredentials') }}
-          </v-btn>
-          <v-btn
-            v-else
-            text
-            x-small
-            :to="{name: routes.SET_KEY}"
-            target="_blank"
-            class="white--text">
-            <v-icon>mdi-lock-open-outline</v-icon>
-            {{ t('LabelSecurecredentials') }}
-          </v-btn>
+          <v-tooltip top>
+            <template #activator="{ on, attrs }">
+              <v-btn
+                x-small
+                text
+                class="white--text"
+                v-bind="attrs"
+                :aria-label="t('LabelOpeninnewtab')"
+                target="_blank"
+                @click="openInNewTab"
+                v-on="on">
+                <v-icon aria-hidden="true">
+                  mdi-open-in-new
+                </v-icon>
+              </v-btn>
+            </template>
+            <span>{{ t('LabelOpeninnewtab') }}</span>
+          </v-tooltip>
         </v-col>
       </v-row>
     </v-footer>
@@ -63,7 +77,11 @@
       :max-width="600"
       persistent>
       <v-card>
-        <v-card-title><v-icon>mdi-lock-outline</v-icon>{{ t('LabelUnlock') }}</v-card-title>
+        <v-card-title>
+          <v-icon aria-hidden="true">
+            mdi-lock-outline
+          </v-icon>{{ t('LabelUnlock') }}
+        </v-card-title>
         <v-card-text>
           <v-alert
             v-if="unlockError"
@@ -76,7 +94,8 @@
           <v-text-field
             v-model="key"
             :label="t('LabelKey')"
-            type="password" />
+            type="password"
+            @keyup.enter="onUnlock" />
           <div class="d-flex flex-row-reverse">
             <v-btn
               class="primary"
@@ -91,10 +110,11 @@
 </template>
 
 <script>
-import browser from '../lib/browser-api'
 import { version as VERSION } from '../../package.json'
-import { actions } from './store'
+import { actions } from './store/definitions'
 import { routes } from './router'
+import Controller from '../lib/Controller'
+import browser from '../lib/browser-api'
 export default {
   name: 'App',
   data() {
@@ -108,25 +128,26 @@ export default {
     locked() {
       return this.$store.state.locked
     },
-    secured() {
-      return this.$store.state.secured
-    },
     routes() {
       return routes
     },
     appStyle() {
       return {
-        background: this.$vuetify.theme.dark ? '#000' : '#e1f5fe'
+        background: this.$vuetify.theme.dark ? '#000' : '#e1f5fe',
       }
-    }
+    },
   },
   async created() {
+    if (window.KAGI) {
+      browser.storage.local.set({ isOrion: true })
+    }
+
     await Promise.all([
       this.$store.dispatch(actions.LOAD_LOCKED),
-      this.$store.dispatch(actions.LOAD_ACCOUNTS)
+      this.$store.dispatch(actions.LOAD_ACCOUNTS),
     ])
-    const background = await browser.runtime.getBackgroundPage()
-    const unregister = background.controller.onStatusChange(() =>
+    const controller = await Controller.getSingleton()
+    const unregister = controller.onStatusChange(() =>
       this.$store.dispatch(actions.LOAD_ACCOUNTS)
     )
     window.addEventListener('beforeunload', unregister)
@@ -142,13 +163,37 @@ export default {
         this.unlockError = e.message
         this.key = ''
       }
-    }
-  }
+    },
+    openInNewTab() {
+      browser.tabs.create({ url: window.location.href })
+    },
+  },
 }
 </script>
 
-<style scoped>
-#app {
-  min-width: 460px;
+<style>
+[dir="rtl"] .v-application {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans Arabic", "Cairo", Roboto, Tahoma, sans-serif !important;
+}
+
+[dir="rtl"] .v-icon.mdi-arrow-left {
+  transform: scaleX(-1);
+}
+
+/*
+ * Extension popups are sized to their content, so the body needs a min-width
+ * or the popup collapses. Apply it by default and only lift it on small touch
+ * screens (mobile browsers open the popup as a full-width page): some desktop
+ * browsers (e.g. Samsung Internet on Windows) don't match device-width queries
+ * in popups, so the min-width must not depend on one matching.
+ */
+body {
+  min-width: 420px;
+}
+
+@media screen and (pointer: coarse) and (max-device-width: 419px) {
+  body {
+    min-width: 0;
+  }
 }
 </style>

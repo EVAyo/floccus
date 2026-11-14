@@ -6,16 +6,20 @@
       :loading="isRunning"
       :error-messages="error"
       @input="$emit('update:username', $event)">
-      <template slot="append-outer">
+      <template
+        slot="append-outer">
         <v-tooltip
           v-if="!isRunning"
           left>
-          <template v-slot:activator="{ on }">
+          <template #activator="{ on }">
             <v-btn
               icon
+              :aria-label="t('LabelLoginFlowStart')"
               @click="onFlowStart"
               v-on="on">
-              <v-icon>mdi-account-circle</v-icon>
+              <v-icon aria-hidden="true">
+                mdi-account-circle
+              </v-icon>
             </v-btn>
           </template>
           <span>{{ t('LabelLoginFlowStart') }}</span>
@@ -23,12 +27,15 @@
         <v-tooltip
           v-else
           left>
-          <template v-slot:activator="{ on }">
+          <template #activator="{ on }">
             <v-btn
               icon
+              :aria-label="t('LabelLoginFlowStop')"
               @click="onFlowStop"
               v-on="on">
-              <v-icon>mdi-cancel</v-icon>
+              <v-icon aria-hidden="true">
+                mdi-cancel
+              </v-icon>
             </v-btn>
           </template>
           <span>{{ t('LabelLoginFlowStop') }}</span>
@@ -36,15 +43,26 @@
       </template>
     </v-text-field>
     <v-text-field
-      :value="password"
-      type="password"
+      :type="showPassword ? 'text' : 'password'"
       :label="t('LabelPassword')"
-      @input="$emit('update:password', $event)" />
+      @input="$emit('update:password', $event)">
+      <template #append>
+        <v-icon
+          role="button"
+          tabindex="0"
+          :aria-label="showPassword ? t('LabelHidepassword') : t('LabelShowpassword')"
+          @click="showPassword = !showPassword"
+          @keydown.enter="showPassword = !showPassword"
+          @keydown.space.prevent="showPassword = !showPassword">
+          {{ showPassword ? 'mdi-eye' : 'mdi-eye-off' }}
+        </v-icon>
+      </template>
+    </v-text-field>
   </div>
 </template>
 
 <script>
-import { actions } from '../store'
+import { actions } from '../store/definitions'
 
 export default {
   name: 'NextcloudLogin',
@@ -63,7 +81,7 @@ export default {
     }
   },
   data() {
-    return {error: null}
+    return {error: null, showPassword: false}
   },
   computed: {
     isRunning() {
@@ -82,7 +100,7 @@ export default {
       }
     },
     async onFlowStop() {
-      await this.$store.dispatch(actions.STOP_LOGIN_FLOW)
+      await this.$store.dispatch('STOP_LOGIN_FLOW')
     }
   }
 }

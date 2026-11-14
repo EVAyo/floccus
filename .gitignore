@@ -1,6 +1,11 @@
 .*.sw*
 dist
+dist-native
 node_modules
 builds
 key.pem
-google-api.credentials.json
+.idea
+.DS_STORE
+
+# Sentry Config File
+.env.sentry-build-plugin

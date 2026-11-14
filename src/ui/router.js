@@ -1,12 +1,11 @@
 import Vue from 'vue'
 import Router from 'vue-router'
 import Overview from './views/Overview'
-import AccountOptions from './views/AccountOptions'
 import NewAccount from './views/NewAccount'
-import SetKey from './views/SetKey'
 import Update from './views/Update'
 import ImportExport from './views/ImportExport'
 import Donate from './views/Donate'
+import About from './views/native/About'
 
 Vue.use(Router)
 
@@ -29,10 +28,11 @@ export const router = new Router({
       name: routes.OVERVIEW,
       component: Overview,
     },
+
     {
       path: '/options/:accountId',
       name: routes.ACCOUNT_OPTIONS,
-      component: AccountOptions,
+      component: () => import(/* webpackPrefetch: true */ './views/AccountOptions'),
     },
     {
       path: '/new',
@@ -40,9 +40,9 @@ export const router = new Router({
       component: NewAccount,
     },
     {
-      path: '/set-key',
-      name: routes.SET_KEY,
-      component: SetKey,
+      path: '/about',
+      name: 'ABOUT',
+      component: About,
     },
     {
       path: '/update',

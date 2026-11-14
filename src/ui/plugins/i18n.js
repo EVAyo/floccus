@@ -1,9 +1,18 @@
-import browser from '../../lib/browser-api'
+import { i18n } from '../../lib/native/I18n'
+
+export function setupDirection(vuetify) {
+  const rtl = i18n.isRTL()
+  vuetify.framework.rtl = rtl
+  if (typeof document !== 'undefined') {
+    document.documentElement.dir = rtl ? 'rtl' : 'ltr'
+    document.documentElement.lang = i18n.getLocale()
+  }
+}
 
 export default {
   methods: {
     t(messageName, substitutions) {
-      return browser.i18n.getMessage(messageName, substitutions)
+      return i18n.getMessage(messageName, substitutions)
     },
   },
 }

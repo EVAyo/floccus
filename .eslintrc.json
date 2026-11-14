@@ -4,7 +4,6 @@
     "commonjs": true,
     "es6": true,
     "node": true,
-    "webextensions": true,
     "mocha": true
   },
   "parserOptions": {
@@ -224,6 +223,8 @@
     // expect.js...
     "no-unused-expressions": ["off"],
     "mocha/no-setup-in-describe": ["off"],
-    "mocha/no-skipped-tests": ["off"]
+    "mocha/no-skipped-tests": ["off"],
+    "vue/multi-word-component-names": ["off"],
+    "vue/no-mutating-props": ["off"]
   }
 }
